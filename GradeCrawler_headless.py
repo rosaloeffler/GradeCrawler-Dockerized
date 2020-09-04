@@ -15,29 +15,14 @@ from selenium import webdriver
 #                                   INFO
 #-------------------------------------------------------------------------------
 # Simple Grade Crawler for DHGE SelfService
-# Version: 1.0
+# Version: 1.0 - Dockerized
 #
-#   Setup:
-#       1. Extract script and Firefoxdriver (geckodriver) in the same diretory
-#               Firefox-Driver: https://github.com/mozilla/geckodriver/releases
-#       2. Install selenium with "pip install selenium"
-#   How to use:
-#       1. Configurate the script at section CONFIG
-#       2. Start the script with py GradeCrawler.py
-#       -> To exit close terminal/cmd or press strg+c
+# Intended for use in a Container, leveraging the mail function
+# , works fine in many other environments
+
+# See README.md for Information on how to setup and run
 #
-#   -> Script create data at first run, check grades in terminal! Later the
-#      script sends notification mails if new grades detected
-#
-# Attention! This crawler use Firefox as Seleniumdriver, but Chrome can be
-# used too.
-#   Chromedriver download:
-#       https://chromedriver.chromium.org/downloads
-#   Config:
-#       Search for line "driver = webdriver.Firefox()" and edit it to
-#       "driver = webdriver.Chrome()"
-#
-# Copyright by Kr3b5
+# Copyright by Kr3b5, rosaloeffler
 
 
 #-------------------------------------------------------------------------------

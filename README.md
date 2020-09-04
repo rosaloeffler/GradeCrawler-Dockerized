@@ -1,50 +1,77 @@
 # Grade Crawler for DHGE Selfservice 
 
-Simple Grade Crawler for DHGE SelfService - Dockerized!!!
+Simple Grade Crawler for DHGE SelfService - Dockerized!!!\
+Intended for Docker (see A., B.), but also works without Docker on Windows and Linux (C.)
 
-## Setup:
+## A. Setup with own image:
   
 1. Install Docker (process platform-dependent), visit https://docs.docker.com/get-started/
 
-2. Configurate the script *GradeCrawler_headless.py* by editing the *configcrawler.ini*-file (MANDATORY!)
+2. Configure the script *GradeCrawler_headless.py* by customizing *example_configcrawler.ini* and rename file to *configcrawler.ini*
 
 3. Copy *Dockerfile*, *configcrawler.ini* and *GradeCrawler_headless.py* into same directory
 
 4. Navigate to that directory and build docker image (dot in the end for current path)\
 &emsp;&emsp;`docker build --tag <image-name>:<tag> .`\
-&emsp;&emsp;example: `docker build --tag gradecrawler:01` 
+&emsp;&emsp;example: `docker build --tag gradecrawler:01`
+
+5. Create + Start container (= docker run)\
+&emsp;`docker run --name <container-name> <image-name>:<tag>`\
+&emsp;example:       `docker run --name gradecrawler_sem4`\
+&emsp;or with output: `docker run -it --name gradecrawler_sem4` 
     
-## Alternative setup for RPi4, using standard-image:
+## B. Alternative setup intended for RPi4, with existing image:
 1. Install Docker (process platform-dependent),\
 &emsp;visit https://docs.docker.com/get-started/
 
-2. Pull standard-image from dockerhub\
+2. Pull image from dockerhub\
 &emsp;`docker pull rosaloeffler/gradecrawler:confexample`
     
-3. See section "How to use" for config
+3. Create + Start container (= docker run)\
+&emsp;`docker run -it --name <container-name> <image-name>:<tag>`\
+&emsp;or with output: `docker run -it --name gradecrawler_sem4` 
 
-## How to use:
-**A. Create and Start container** (=> docker run)\
-&emsp;`docker run --name <container-name> <image-name>:<tag>`\
-&emsp;example:       `docker run --name gradecrawler_sem4`\
-&emsp;alternatively: `docker run -it --name gradecrawler_sem4`
-   
-**OR**
-   
-**B. Start existing container**\
-&emsp;`docker start <container-name>`\
-&emsp;alternatively: `docker start <container-name> -ia`
-    
-**Connect after start** (for checking or editing configcrawler.ini, MANDATORY if created from standard-image)\
-&emsp;Get the name of the existing container `docker ps -a`\
+4. Connect after start to change config\
+&emsp;Get the name of an existing container `docker ps -a`\
 &emsp;Get a bash shell in a running container `docker exec -it <container name> /bin/bash`\
 &emsp;Install nano in the container: `sudo apt-get nano`\
 &emsp;Change credentials etc. `sudo nano /code/configcrawler.ini`
+
+5. Restart container, to apply changed config
+&emsp;`docker restart <container-name>`
+
+## C. Alternative setup without docker
+1. Copy *GradeCrawler_headless.py* and *example_configcrawler.ini* into the same directory
+
+2. Customize settings and credentials in *example_configcrawler.ini* and rename file to *configcrawler.ini*
+
+3. `sudo apt install python3.7`
+
+4. `pip install selenium`
+
+5. `apt-get update`
+
+6. `apt-get install chromium`
+
+7. `apt-get install chromium-driver`
+
+:warning: On Windows 10 *chromedriver.exe* has to be in the same directory as the .ini- and .py-files
+
+## How to use:
+**A., B.**\
+Application should run in container after setup.
+
+:information_source: In case container stopped: start existing container\
+&emsp;`docker start <container-name>`\
+&emsp;or with output: `docker start <container-name> -ia`
+
+**C.**\
+Execute *GradeCrawler_headless.py*
            
 :information_source: To exit close terminal/cmd or press `strg+c`
 
-:information_source: Script creates data at first run, you can check grades in terminal\
-&emsp;if `-it` or `-ia` switches where used when executing A or B, respectively.\
+:information_source: Script creates data at first run, you can check grades in terminal or in the respective files\
+&emsp;if `-it` or `-ia` switches where used when executing `docker run` or `docker start`, respectively.\
 &emsp;Later the script sends notification mails if new grades are detected
 
 ___

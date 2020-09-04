@@ -1,4 +1,4 @@
-# rosaloeffler
+# from rosaloeffler
 .vscode/
 gradecrawler_dev/
 
@@ -11,7 +11,7 @@ GradeCrawlerDEV\.py
 
 *.log
 
-# from github python template
+# -----------from github python template-----------------------
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
