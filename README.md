@@ -1,6 +1,6 @@
 # Grade Crawler for DHGE Selfservice 
 
-Simple Grade Crawler for DHGE SelfService - Dockerized!!! BLBAAA
+Simple Grade Crawler for DHGE SelfService - Dockerized!!!
 
 ## Setup:
   
