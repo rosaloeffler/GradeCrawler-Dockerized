@@ -1,11 +1,15 @@
 #!/usr/bin/env python
-from selenium.webdriver.support.ui import Select
-from selenium import webdriver
+import json
+import configparser
+import smtplib
+import ssl # important for execution outside conda prompt
 from datetime import datetime
 from socket import gaierror
 from time import sleep
-import smtplib
-import getpass
+from email.message import EmailMessage
+from selenium.webdriver.support.ui import Select
+from selenium import webdriver
+
 
 #-------------------------------------------------------------------------------
 #                                   INFO
@@ -18,8 +22,7 @@ import getpass
 #               Firefox-Driver: https://github.com/mozilla/geckodriver/releases
 #       2. Install selenium with "pip install selenium"
 #   How to use:
-#       1. Configurate the script at section CONFIG or use the init wizard
-#          (activate use_wizard in section WIZARDs)
+#       1. Configurate the script at section CONFIG
 #       2. Start the script with py GradeCrawler.py
 #       -> To exit close terminal/cmd or press strg+c
 #
@@ -38,40 +41,45 @@ import getpass
 
 
 #-------------------------------------------------------------------------------
-#                                   WIZARD
+#                                   LOAD-CONFIG
 #-------------------------------------------------------------------------------
-use_wizard = False           #(True/False)
 
-#-------------------------------------------------------------------------------
-#                                   CONFIG
-#-------------------------------------------------------------------------------
+# load config-file, used instead of json because ini-file allows comments
+config = configparser.ConfigParser()
+config.read("./configcrawler.ini")
+
 # Credentials DHGE-Service
-url_dhge = "https://gera.dhge.de/SelfService/start.php"
-matnr = ""
-passw = ""
-semester = 3
+url_dhge = config["URLCREDENTIALS"]["url_dhge"]
+matnr = config["URLCREDENTIALS"]["matnr"]
+passw = config["URLCREDENTIALS"]["passw"]
 
-#Features
-want_Mail = True #(True/False) want a Mail -> config SMTP Server
+# grades of which semesters
+# loaded as json because of support for data formats other than str
+semesters = json.loads(config["PREFERENCES"]["semesters"])
 
-#Filename
-file_name = "grades_" + str(semester) + ".txt"
+#first part of filename
+fileprefix = config["PREFERENCES"]["fileprefix"]
 
-#Delay Check / Online Time
-delay = 1800    #1min = 60
-start_time = 7
-end_time = 18
+# Delay Check / Online Time
+delay = int(config["PREFERENCES"]["delay"])    #1min = 60, minimum 6*loop_delay
+start_time = int(config["PREFERENCES"]["start_time"])
+end_time = int(config["PREFERENCES"]["end_time"])
 
-#SMTP Server (Mail)
-port = 1025
-smtp_server = "localhost"
-login = ""
-password = ""
+# Features
+want_Mail = config.getboolean("MAILSETTINGS","want_mail")
 
-# Mail Content
-sender = "GradeService@test.com"
-receiver = "Me@test.com"
-subject = "Neue Noten"
+# SMTP Server (Mail)
+port = int(config["MAILSETTINGS"]["port"])
+smtp_server = config["MAILSETTINGS"]["smtp_server"]
+login = config["MAILSETTINGS"]["login"]
+mailpassw = config["MAILSETTINGS"]["password"]
+
+# Mail config
+sender = config["MAILSETTINGS"]["sender"]
+subject = config["MAILSETTINGS"]["subject"]
+# loaded as json because of support for data formats other than str
+receivers = json.loads(config["MAILSETTINGS"]["receivers"])
+
 #-------------------------------------------------------------------------------
 #                   DEV-CONFIG - activate only for Dev
 #-------------------------------------------------------------------------------
@@ -87,6 +95,7 @@ dev_mode_mail = 0 # 0 = off | 1 = on - no credetials for Debug Mail Server
 #-------------------------------------------------------------------------------
 
 def main():
+    """Banner, Infinte loop and function calls"""
     print("   _____               _         _____                    _           ")
     print("  / ____|             | |       / ____|                  | |          ")
     print(" | |  __ _ __ __ _  __| | ___  | |     _ __ __ ___      _| | ___ _ __ ")
@@ -96,72 +105,51 @@ def main():
     print("                                                   Copyright by Kr3b5\n")
     printcmd("Starting... \n")
 
-    if(use_wizard == True):
-        init_wizard()
-
     idle_print = 1
+    loop_delay = 10 # just to slow down
 
     while True:
         this_hour = datetime.now().hour
         #check if time is in range -> reduce traffic
-        if(is_online(this_hour)):
-            # get web content
-            html_source = get_content()
-            #get grade list from html_source
-            grade_list = get_grade(html_source)
-            #get old grade list
-            old_grade_list = get_list()
-            #compare both for new grades
-            compare(grade_list, old_grade_list)
-            #reduce output idle
-            idle_print = 1
+        if is_online(this_hour):
+            for semester in semesters:
+                # set filesuffix
+                filesuffix = str(semester) + ".txt"
+                # get web content
+                html_source = get_content(semester)
+                #get grade list from html_source
+                grade_list = get_grade(html_source)
+                #get old grade list
+                old_grade_list = get_list(filesuffix)
+                #compare both for new grades
+                compare(grade_list, old_grade_list, filesuffix)
+                #reduce output idle
+                idle_print = 1
+                sleep(loop_delay)
         else:
-            if(idle_print == 1 ):
+            if idle_print == 1:
                 printcmd(f"> Idle - next check:{start_time}:00\n")
                 idle_print = 0
         sleep(delay)
 
 
-def init_wizard():
-    printcmd("Start Init Wizard... \n")
-    # Credentials DHGE-Service
-    matnr = input("? Matrikelnummer: ")
-    passw = getpass.getpass(prompt='? Passwort: ')
-    semester = int(input("? Semester(1-6): "))
-    print("----------------------------------------------------------")
-    #Delay Check / Online Time
-    delay = int(input("? In welchen Minutentakt checken: "))*60   #1min = 60
-    print("----------------------------------------------------------")
-    #SMTP Server (Mail)
-    if( input("? Aktiviere Mail (True/False): ").lower() == 'true'):
-        want_Mail = True
-    else:
-        want_Mail = False
-    if(want_Mail == True):
-        port = int(input("? SMTP Server Port: "))
-        smtp_server = input("? SMTP Server Adresse: ")
-        login = input("? Loginname: ")
-        password = getpass.getpass(prompt='? Passwort: ')
-        # Mail Content
-        sender = input("? Sendername: ")
-        receiver = input("? Empfänger: ")
-        subject = input("? Betreff: ")
-    print("")
-    printcmd("Setup complete! Start crawler...\n")
-
-
 def is_online(time):
+    """Check whether within polling-hours"""
     if( time >= start_time and time < end_time ):
         return True
     else:
         return False
 
 
-def get_content():
-    driver = webdriver.Firefox()
+def get_content(sem):
+    """get html-content, return as string"""
+    coptions = webdriver.ChromeOptions()
+    coptions.add_argument("headless") # for servers
+    coptions.add_argument('no-sandbox') # maybe not secure, but inevitable ?
+    driver = webdriver.Chrome(options=coptions)
     driver.get(url_dhge)
 
-    if( dev_mode_view == 0 ):
+    if dev_mode_view == 0:
         username = driver.find_element_by_name("matrnr")
         username.clear()
         username.send_keys(matnr)
@@ -169,16 +157,16 @@ def get_content():
         password.clear()
         password.send_keys(passw)
         select_element = Select(driver.find_element_by_name("sem"))
-        select_element.select_by_value(str(semester))
+        select_element.select_by_value(str(sem))
         driver.find_element_by_xpath("//input[@value='Notenauskunft (Bildschirm)']").click()
 
     html_source = driver.page_source
-    driver.close()
+    driver.quit()
 
     return html_source
 
-
 def get_grade( html_source ):
+    """pick grades from html-content"""
     grade_list = []
 
     s1 = html_source.split("<tr>")
@@ -187,7 +175,7 @@ def get_grade( html_source ):
 
     anz = 0
     for i in range(len(s1)):
-        if( s1[i] == "<td colspan=\"9\"><hr></td></tr>" ):
+        if s1[i] == "<td colspan=\"9\"><hr></td></tr>":
             anz = i
 
     for i in range(anz):
@@ -202,68 +190,81 @@ def get_grade( html_source ):
         grade_list.append(fach)
         grade_list.append(note)
 
-    return (grade_list)
+    return grade_list
 
 
-def write_file(grade_list):
-    with open(file_name, 'w') as f:
+def write_file(grade_list, suffix):
+    """write grade file for comparison later"""
+    with open(fileprefix + suffix, 'w') as f:
         for item in grade_list:
             f.write("%s\n" % item)
 
 
-def get_list():
+def get_list(suffix):
+    """return list of known grades from file"""
     try:
-        return [line.rstrip('\n') for line in open(file_name, 'r')]
+        return [line.rstrip('\n') for line in open(fileprefix + suffix, 'r')]
     except FileNotFoundError:
         return "[]"
 
 
-def compare(grade_list, old_grade_list):
-    if(isinstance(old_grade_list, str)):
+def compare(grade_list, old_grade_list, suffix):
+    """compare lists of old and new grades, print results, call send_mail"""
+    printcmd("Semester: " + suffix[:1])
+    if isinstance(old_grade_list, str):
         printcmd("First init run!")
-        write_file(grade_list)
+        write_file(grade_list, suffix)
         printcmd("Gradelist (new):")
         printcmd(grade_list)
         print("")
-    elif(grade_list == old_grade_list):
+    elif grade_list == old_grade_list:
         printcmd("No new grades available!")
         printcmd("Gradelist (old|new):")
         printcmd(old_grade_list)
         print("")
     else:
         printcmd("New grades available!")
-        write_file(grade_list)
+        write_file(grade_list, suffix)
         printcmd("Gradelist (old|new):")
         printcmd(old_grade_list)
         printcmd(grade_list)
         print("")
-        if( want_Mail ):
-            send_mail(grade_list)
+        if want_Mail:
+            send_mail(grade_list, suffix)
 
 
-def send_mail(grade_list):
-    print(f"> Send mail to {receiver}...")
-    message = f"""\
-    Subject: {subject}
-    To: {receiver}
-    From: {sender}
-    {str(grade_list)}"""
-    try:
-      with smtplib.SMTP(smtp_server, port) as server:
-        if( dev_mode_mail == 0 ):
-            server.login(login, password)
-        server.sendmail(sender, receiver, message)
-    except (gaierror, ConnectionRefusedError):
-      printcmd('Failed to connect to the server. Bad connection settings?')
-    except smtplib.SMTPServerDisconnected:
-      printcmd('Failed to connect to the server. Wrong user/password?')
-    except smtplib.SMTPException as e:
-      printcmd('SMTP error occurred: ' + str(e))
-    else:
-      printcmd('Success')
-    print("")
+def send_mail(grade_list, suffix):
+    """send emails if new grades are fetched"""
+    for receiver, sendgrades in receivers.items():
+        print(f"> Send mail to {receiver}...")
+        msg = EmailMessage()
+        msg['From'] = sender
+        msg['To'] = receiver
+        msg['Subject'] = subject
+        mcontent = "Semester: " + suffix[:1]
+        if sendgrades:
+            mcontent += "\n" + str(grade_list)
+        else:
+            mcontent += "\nGrades are top-secret ;-)!"
+        msg.set_content(mcontent)
+        try:
+            with smtplib.SMTP(smtp_server, port) as server:
+                if dev_mode_mail == 0:
+                    server.starttls() ####
+                    server.login(login, mailpassw)
+                server.send_message(msg) ####
+        except (gaierror, ConnectionRefusedError):
+            printcmd('Failed to connect to the server. Bad connection settings?')
+        except smtplib.SMTPServerDisconnected:
+            printcmd('Failed to connect to the server. Wrong user/password?')
+        except smtplib.SMTPException as e:
+            printcmd('SMTP error occurred: ' + str(e))
+        else:
+            printcmd('Success')
+        print("")
 
 def printcmd(s):
+    """print statements with timestamp"""
     dateTimeObj = datetime.now()
     timestampStr = dateTimeObj.strftime("[%b %d %y %H:%M:%S]")
     print(f"{timestampStr} {s}" )
