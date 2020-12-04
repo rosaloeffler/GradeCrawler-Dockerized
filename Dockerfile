@@ -8,11 +8,10 @@ COPY ./configcrawler.ini /code/configcrawler.ini
 
 RUN pip install selenium
 
-RUN apt-get -y update
-
-RUN apt-get install -y chromium
-
+RUN apt-get -y update && apt-get install -y \
+    chromium \
+    chromium-driver \
+    && rm -rf /var/lib/apt/lists/*
 # chromedriver (bzw. chromium-driver) just has to be installed not put in same folder
-RUN apt-get install -y chromium-driver
 
 CMD [ "python", "/code/GradeCrawler_headless.py" ]

@@ -28,11 +28,11 @@ Additional features of the fork:
 
 4. Navigate to that directory and build docker image (dot in the end for current path)\
 &emsp;&emsp;`docker build --tag <image-name>:<tag> .`\
-&emsp;&emsp;example: `docker build --tag gradecrawler:01`
+&emsp;&emsp;example: `docker build --tag gradecrawler:01 .`
 
 5. Create + start container (= docker run)\
 &emsp;`docker run --name <container-name> <image-name>:<tag>`\
-&emsp;example:       `docker run --name gradecrawler`\
+&emsp;example:       `docker run --name gradecrawler gradecrawler:v0x`\
 &emsp;or with shell: `docker run -it --name gradecrawler` 
     
 ## B. Alternative setup intended for RPi4, with existing image:
